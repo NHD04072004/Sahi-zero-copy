@@ -1,34 +1,49 @@
 <div align="center">
 <h1>
-  SAHI: Slicing Aided Hyper Inference
+  SAHI Zero-Copy: GPU-Optimized Slicing Aided Hyper Inference
 </h1>
 
 <h4>
-  A lightweight vision library for performing large scale object detection & instance segmentation
+  A fork of SAHI with GPU tensor-based inference for zero-copy processing
 </h4>
 
 <h4>
     <img width="700" alt="teaser" src="https://raw.githubusercontent.com/obss/sahi/main/resources/sahi-sliced-inference-overview.avif">
 </h4>
 
-<div>
-    <a href="https://pepy.tech/project/sahi"><img src="https://pepy.tech/badge/sahi" alt="downloads"></a>
-    <a href="https://pepy.tech/project/sahi"><img src="https://pepy.tech/badge/sahi/month" alt="downloads"></a>
-    <a href="https://github.com/obss/sahi/blob/main/LICENSE.md"><img src="https://img.shields.io/pypi/l/sahi" alt="License"></a>
-    <a href="https://badge.fury.io/py/sahi"><img src="https://badge.fury.io/py/sahi.svg" alt="pypi version"></a>
-    <a href="https://anaconda.org/conda-forge/sahi"><img src="https://anaconda.org/conda-forge/sahi/badges/version.svg" alt="conda version"></a>
-    <a href="https://github.com/obss/sahi/actions/workflows/ci.yml"><img src="https://github.com/obss/sahi/actions/workflows/ci.yml/badge.svg" alt="Continuous Integration"></a>
-  <br>
-    <a href="https://context7.com/obss/sahi"><img src="https://img.shields.io/badge/Context7%20MCP-Indexed-blue" alt="Context7 MCP"></a>
-    <a href="https://context7.com/obss/sahi/llms.txt"><img src="https://img.shields.io/badge/llms.txt-✓-brightgreen" alt="llms.txt"></a>
-    <a href="https://ieeexplore.ieee.org/document/9897990"><img src="https://img.shields.io/badge/DOI-10.1109%2FICIP46576.2022.9897990-orange.svg" alt="ci"></a>
-    <a href="https://colab.research.google.com/github/obss/sahi/blob/main/demo/inference_for_ultralytics.ipynb"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a>
-    <a href="https://huggingface.co/spaces/fcakyon/sahi-yolox"><img src="https://raw.githubusercontent.com/obss/sahi/main/resources/hf_spaces_badge.svg" alt="HuggingFace Spaces"></a>
-    <a href="https://deepwiki.com/obss/sahi"><img src="https://img.shields.io/badge/DeepWiki-obss%2Fsahi-blue.svg?logo=data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACwAAAAyCAYAAAAnWDnqAAAAAXNSR0IArs4c6QAAA05JREFUaEPtmUtyEzEQhtWTQyQLHNak2AB7ZnyXZMEjXMGeK/AIi+QuHrMnbChYY7MIh8g01fJoopFb0uhhEqqcbWTp06/uv1saEDv4O3n3dV60RfP947Mm9/SQc0ICFQgzfc4CYZoTPAswgSJCCUJUnAAoRHOAUOcATwbmVLWdGoH//PB8mnKqScAhsD0kYP3j/Yt5LPQe2KvcXmGvRHcDnpxfL2zOYJ1mFwrryWTz0advv1Ut4CJgf5uhDuDj5eUcAUoahrdY/56ebRWeraTjMt/00Sh3UDtjgHtQNHwcRGOC98BJEAEymycmYcWwOprTgcB6VZ5JK5TAJ+fXGLBm3FDAmn6oPPjR4rKCAoJCal2eAiQp2x0vxTPB3ALO2CRkwmDy5WohzBDwSEFKRwPbknEggCPB/imwrycgxX2NzoMCHhPkDwqYMr9tRcP5qNrMZHkVnOjRMWwLCcr8ohBVb1OMjxLwGCvjTikrsBOiA6fNyCrm8V1rP93iVPpwaE+gO0SsWmPiXB+jikdf6SizrT5qKasx5j8ABbHpFTx+vFXp9EnYQmLx02h1QTTrl6eDqxLnGjporxl3NL3agEvXdT0WmEost648sQOYAeJS9Q7bfUVoMGnjo4AZdUMQku50McDcMWcBPvr0SzbTAFDfvJqwLzgxwATnCgnp4wDl6Aa+Ax283gghmj+vj7feE2KBBRMW3FzOpLOADl0Isb5587h/U4gGvkt5v60Z1VLG8BhYjbzRwyQZemwAd6cCR5/XFWLYZRIMpX39AR0tjaGGiGzLVyhse5C9RKC6ai42ppWPKiBagOvaYk8lO7DajerabOZP46Lby5wKjw1HCRx7p9sVMOWGzb/vA1hwiWc6jm3MvQDTogQkiqIhJV0nBQBTU+3okKCFDy9WwferkHjtxib7t3xIUQtHxnIwtx4mpg26/HfwVNVDb4oI9RHmx5WGelRVlrtiw43zboCLaxv46AZeB3IlTkwouebTr1y2NjSpHz68WNFjHvupy3q8TFn3Hos2IAk4Ju5dCo8B3wP7VPr/FGaKiG+T+v+TQqIrOqMTL1VdWV1DdmcbO8KXBz6esmYWYKPwDL5b5FA1a0hwapHiom0r/cKaoqr+27/XcrS5UwSMbQAAAABJRU5ErkJggg==" alt="Sliced/tiled inference DeepWiki"></a>
-  <a href="https://squidfunk.github.io/mkdocs-material/"><img src="https://img.shields.io/badge/Material_for_MkDocs-526CFE?logo=MaterialForMkDocs&logoColor=white" alt="built-with-material-for-mkdocs"></a>
+> **🚀 This fork adds GPU tensor-based operations to minimize CPU-GPU data transfers**
 
 </div>
-</div>
+
+## What's Different in This Fork?
+
+This fork extends the original SAHI library with **GPU-optimized, tensor-based inference** to achieve near zero-copy processing:
+
+### ✅ New GPU Functions
+
+| Function | Description |
+|----------|-------------|
+| `slice_image_gpu()` | Slice images directly as GPU tensors |
+| `get_prediction_gpu()` | Run prediction on GPU tensor input |
+| `get_sliced_prediction_gpu()` | Full sliced inference pipeline on GPU |
+| `perform_inference_gpu()` | Direct GPU tensor inference in models |
+| `read_image_as_tensor()` | Load images as PyTorch tensors |
+
+### ⚡ Performance Optimizations
+
+- **In-place normalization**: `tensor.div_(255.0)` instead of creating new tensors
+- **GPU tensor slicing**: Slices stay on GPU memory
+- **Reduced CPU-GPU transfers**: Minimal data movement between devices
+
+### 📋 Requirements
+
+- PyTorch with CUDA support
+- CUDA 11.6+ (recommended for nvjpeg stability)
+- Ultralytics YOLO models
+
+---
+
+
 
 ## <div align="center">Overview</div>
 
@@ -54,12 +69,69 @@ SAHI helps developers overcome real-world challenges in object detection by enab
 
 SAHI's documentation is [indexed in Context7 MCP](https://context7.com/obss/sahi), providing AI coding assistants with up-to-date, version-specific code examples and API references. We also provide an [llms.txt](https://context7.com/obss/sahi/llms.txt) file following the emerging standard for AI-readable documentation. To integrate SAHI docs with your AI development workflow, check out the [Context7 MCP installation guide](https://github.com/upstash/context7#%EF%B8%8F-installation).
 
+## <div align="center">🚀 GPU Quick Start</div>
+
+### GPU Tensor-based Inference (This Fork)
+
+```python
+import torch
+from sahi.models.ultralytics import UltralyticsDetectionModel
+from sahi.predict import get_sliced_prediction_gpu
+from sahi.utils.cv import read_image_as_tensor
+
+# Load model on GPU
+detection_model = UltralyticsDetectionModel(
+    model_path="yolo11n.pt",
+    confidence_threshold=0.5,
+    device="cuda",
+    load_at_init=True,
+    image_size=640,
+)
+
+# Read image directly as GPU tensor
+image_tensor = read_image_as_tensor("image.jpg", device="cuda")
+
+# Run GPU-optimized sliced prediction
+result = get_sliced_prediction_gpu(
+    image=image_tensor,
+    detection_model=detection_model,
+    slice_height=512,
+    slice_width=512,
+    overlap_height_ratio=0.2,
+    overlap_width_ratio=0.2,
+    device="cuda",
+)
+
+print(f"Detected {len(result.object_prediction_list)} objects")
+```
+
+### GPU Slicing Only
+
+```python
+from sahi.slicing import slice_image_gpu
+from sahi.utils.cv import read_image_as_tensor
+
+# Read and slice on GPU
+image_tensor = read_image_as_tensor("large_image.jpg", device="cuda")
+slices = slice_image_gpu(
+    image=image_tensor,
+    slice_height=512,
+    slice_width=512,
+    device="cuda",
+)
+
+# All slices are GPU tensors
+for i, slice_img in enumerate(slices.images):
+    print(f"Slice {i}: {slice_img.shape}, device: {slice_img.device}")
+```
+
 ## <div align="center">Installation</div>
 
 ### Basic Installation
 
 ```bash
 pip install sahi
+
 ```
 
 <details closed>
