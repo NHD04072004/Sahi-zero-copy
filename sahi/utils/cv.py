@@ -230,37 +230,40 @@ def read_image_as_tensor(image: Image.Image | str | np.ndarray | torch.Tensor, d
 
     if isinstance(image, torch.Tensor):
         img_tensor = image
+
     elif isinstance(image, Image.Image):
-        img_tensor = torch.from_numpy(np.array(image))
+        img_tensor = torch.from_numpy(np.array(image)).permute(2, 0, 1)
 
     elif isinstance(image, str):
-        # read image if str image path is provided
         try:
-            image_cv2 = cv2.imread(image)
-            img_tensor = torch.from_numpy(image_cv2)
+            import torchvision.io
+            data = torchvision.io.read_file(image)
+            img_tensor = torchvision.io.decode_image(data, apply_exif_orientation=True)
         except Exception as e:  # handle large/tiff image reading
-            logger.error(f"cv2 failed reading image with error {e}, trying skimage instead")
+            logger.error(f"torchvision failed reading image with error {e}, trying skimage instead")
             try:
                 import skimage.io
             except ImportError:
                 raise ImportError("Please run 'pip install -U scikit-image imagecodecs' for large image handling.")
             image_sk = skimage.io.imread(image).astype(np.uint8)
-            if len(image_sk.shape) == 2:  # b&w
-                img_tensor = torch.from_numpy(np.array(Image.fromarray(image_sk, mode="1")))
-            elif image_sk.shape[2] == 4:  # rgba
-                img_tensor = torch.from_numpy(np.array(Image.fromarray(image_sk, mode="RGBA")))
-            elif image_sk.shape[2] == 3:  # rgb
-                img_tensor = torch.from_numpy(np.array(Image.fromarray(image_sk, mode="RGB")))
+            if len(image_sk.shape) == 2:  # b&w - add channel dim
+                img_tensor = torch.from_numpy(image_sk).unsqueeze(0)  # HW -> 1HW (CHW)
+            elif image_sk.shape[2] == 4:  # rgba HWC -> CHW
+                img_tensor = torch.from_numpy(image_sk).permute(2, 0, 1)
+            elif image_sk.shape[2] == 3:  # rgb HWC -> CHW
+                img_tensor = torch.from_numpy(image_sk).permute(2, 0, 1)
             else:
-                raise TypeError(f"image with shape: {image_sk.shape[3]} is not supported.")
+                raise TypeError(f"image with shape: {image_sk.shape} is not supported.")
+
     elif isinstance(image, np.ndarray):
-        # check if image is in CHW format (Channels, Height, Width)
-        # heuristic: 3 dimensions, first dim (channels) < 5, last dim (width) > 4
-        if image.ndim == 3 and image.shape[0] < 5:  # image in CHW
-            if image.shape[2] > 4:
-                # convert CHW to HWC (Height, Width, Channels)
-                image = np.transpose(image, (1, 2, 0))
-        img_tensor = torch.from_numpy(image)
+        if image.ndim == 3 and image.shape[0] <= 4 and image.shape[2] > 4:
+            img_tensor = torch.from_numpy(image)
+        elif image.ndim == 3:
+            img_tensor = torch.from_numpy(image).permute(2, 0, 1)  # HWC -> CHW
+        elif image.ndim == 2:
+            img_tensor = torch.from_numpy(image).unsqueeze(0)
+        else:
+            raise TypeError(f"Unsupported numpy array shape: {image.shape}")
     else:
         raise TypeError("read image with 'pillow' using 'Image.open()'")
     img_tensor = img_tensor.to(device)

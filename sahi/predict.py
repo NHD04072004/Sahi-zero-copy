@@ -193,8 +193,7 @@ def get_prediction_gpu(
     durations_in_seconds["prediction"] = time_end
 
     if full_shape is None:
-        # Tensor format from read_image_as_tensor: (H, W, C)
-        full_shape = [image_as_tensor.shape[0], image_as_tensor.shape[1]]
+        full_shape = [image_as_tensor.shape[1], image_as_tensor.shape[2]]
 
     # process prediction
     time_start = time.perf_counter()

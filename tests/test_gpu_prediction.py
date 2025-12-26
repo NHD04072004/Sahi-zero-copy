@@ -332,16 +332,19 @@ class TestReadImageAsTensor:
     def test_read_from_numpy(self):
         """Test converting numpy array to tensor."""
         image_path = "tests/data/small-vehicles1.jpeg"
-        image_np = read_image(image_path)
+        image_np = read_image(image_path)  # HWC format
         
         image_tensor = read_image_as_tensor(image_np, device="cpu")
         
         assert isinstance(image_tensor, torch.Tensor)
-        assert image_tensor.shape == image_np.shape
+        # Tensor should be CHW, numpy is HWC - dimensions are permuted
+        assert image_tensor.shape[0] == image_np.shape[2]  # C
+        assert image_tensor.shape[1] == image_np.shape[0]  # H
+        assert image_tensor.shape[2] == image_np.shape[1]  # W
 
     def test_read_tensor_passthrough(self):
-        """Test that tensor input is passed through."""
-        original_tensor = torch.randn(480, 640, 3)
+        """Test that tensor input is passed through (assumed CHW)."""
+        original_tensor = torch.randn(3, 480, 640)  # CHW format
         
         result_tensor = read_image_as_tensor(original_tensor, device="cpu")
         
@@ -443,16 +446,16 @@ class TestEdgeCases:
         assert all(isinstance(img, torch.Tensor) for img in slice_result_small.images)
         assert all(isinstance(img, torch.Tensor) for img in slice_result_large.images)
 
-    def test_tensor_hwc_format(self):
-        """Test that tensor input in HWC format works correctly."""
+    def test_tensor_chw_format(self):
+        """Test that tensor input in CHW format works correctly."""
         image_path = "tests/data/small-vehicles1.jpeg"
         image_tensor = read_image_as_tensor(image_path, device="cpu")
         
-        # Should be HWC format (Height, Width, Channels)
+        # Should be CHW format (Channel, Height, Width)
         assert image_tensor.ndim == 3
-        assert image_tensor.shape[2] == 3  # 3 channels (BGR/RGB)
+        assert image_tensor.shape[0] == 3  # 3 channels (RGB)
         
-        # Test slicing with HWC tensor
+        # Test slicing with CHW tensor
         slice_result = slice_image_gpu(
             image=image_tensor,
             slice_height=256,
@@ -461,9 +464,10 @@ class TestEdgeCases:
         )
         
         assert len(slice_result) > 0
-        # Each slice should also be HWC format
+        # Each slice should also be CHW format
         for img in slice_result.images:
             assert img.ndim == 3
+            assert img.shape[0] == 3  # Channel dim first
 
     @pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA not available")
     def test_device_transfer(self):

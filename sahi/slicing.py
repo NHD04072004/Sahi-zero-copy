@@ -482,7 +482,7 @@ def slice_image_gpu(
     image_tensor = read_image_as_tensor(image, device=device)
     verboselog("image.shape: " + str(image_tensor.shape))
 
-    image_width, image_height = image_tensor.shape[1], image_tensor.shape[0]
+    image_height, image_width = image_tensor.shape[1], image_tensor.shape[2]
     if not (image_width != 0 and image_height != 0):
         raise RuntimeError(f"invalid image size: {image_tensor.shape} for 'slice_image'.")
     slice_bboxes = get_slice_bboxes(
@@ -509,7 +509,7 @@ def slice_image_gpu(
         tly = slice_bbox[1]
         brx = slice_bbox[2]
         bry = slice_bbox[3]
-        image_tensor_slice = image_tensor[tly:bry, tlx:brx]
+        image_tensor_slice = image_tensor[:, tly:bry, tlx:brx]
 
         # set image file suffixes
         slice_suffixes = "_".join(map(str, slice_bbox))

@@ -22,6 +22,7 @@ class UltralyticsDetectionModel(DetectionModel):
 
     def __init__(self, *args, **kwargs):
         self.fuse: bool = kwargs.pop("fuse", False)
+        self.half: bool = kwargs.pop("half", False)
         existing_packages = getattr(self, "required_packages", None) or []
         self.required_packages = [*list(existing_packages), "ultralytics"]
         super().__init__(*args, **kwargs)
@@ -45,6 +46,8 @@ class UltralyticsDetectionModel(DetectionModel):
             self.set_model(model)
             if self.fuse and hasattr(model, "fuse"):
                 model.fuse()
+            if self.half and hasattr(model, "half"):
+                model.half()
 
         except Exception as e:
             raise TypeError("model_path is not a valid Ultralytics model path: ", e)
@@ -142,7 +145,7 @@ class UltralyticsDetectionModel(DetectionModel):
         Args:
             image: torch.Tensor
                 A torch tensor that contains the image to be predicted. 
-                Can be HWC (H, W, C) or BCHW (B, C, H, W) format.
+                Expected CHW (C, H, W) or BCHW (B, C, H, W) format.
                 3 channel image should be in RGB order.
         """
 
@@ -150,36 +153,25 @@ class UltralyticsDetectionModel(DetectionModel):
         if self.model is None:
             raise ValueError("Model is not loaded, load it by calling .load_model()")
 
-        # Store original shape before conversion (H, W, C format)
         if image.ndim == 3:
-            # HWC format
-            original_h, original_w, original_c = image.shape
+            original_c, original_h, original_w = image.shape
             self._original_shape = (original_h, original_w, original_c)
-            # Convert HWC -> CHW -> BCHW
-            image_bchw = image.permute(2, 0, 1).unsqueeze(0)
+            image_bchw = image.unsqueeze(0)
         elif image.ndim == 4:
-            # Already batched, check if BHWC or BCHW
-            if image.shape[3] == 3:  # BHWC format
-                original_h, original_w, original_c = image.shape[1], image.shape[2], image.shape[3]
-                self._original_shape = (original_h, original_w, original_c)
-                image_bchw = image.permute(0, 3, 1, 2)
-            else:  # Already BCHW
-                original_c, original_h, original_w = image.shape[1], image.shape[2], image.shape[3]
-                self._original_shape = (original_h, original_w, original_c)
-                image_bchw = image
+            original_c, original_h, original_w = image.shape[1], image.shape[2], image.shape[3]
+            self._original_shape = (original_h, original_w, original_c)
+            image_bchw = image
         else:
-            raise ValueError(f"Unsupported tensor shape: {image.shape}. Expected 3D (HWC) or 4D (BCHW/BHWC).")
+            raise ValueError(f"Unsupported tensor shape: {image.shape}. Expected 3D (CHW) or 4D (BCHW).")
 
-        # Normalize to [0, 1] if uint8
         if image_bchw.dtype == torch.uint8:
             image_bchw = image_bchw.to(torch.float32).div_(255.0)
         elif image_bchw.dtype != torch.float32:
             image_bchw = image_bchw.float()
 
-        # Pad to multiple of stride 32 (Ultralytics requirement for tensor input)
         stride = 32
         h, w = image_bchw.shape[2], image_bchw.shape[3]
-        pad_h = (stride - h % stride) % stride  # 0 if already divisible
+        pad_h = (stride - h % stride) % stride
         pad_w = (stride - w % stride) % stride
 
         if pad_h > 0 or pad_w > 0:
