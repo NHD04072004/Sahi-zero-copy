@@ -223,6 +223,108 @@ def get_prediction_gpu(
         image=image, object_prediction_list=object_prediction_list, durations_in_seconds=durations_in_seconds
     )
 
+def get_prediction_gpu_batch(
+    images,
+    detection_model,
+    shift_amount_list: list[list[int]] | None = None,
+    full_shape=None,
+    postprocess: PostprocessPredictions | None = None,
+    verbose: int = 0,
+    exclude_classes_by_name: list[str] | None = None,
+    exclude_classes_by_id: list[int] | None = None,
+    device: str | None = None,
+) -> list[ObjectPrediction]:
+    """Function for performing batch prediction on multiple images using given detection_model.
+
+    Args:
+        images: torch.Tensor
+            Batch tensor of shape (B, C, H, W) containing images to predict
+        detection_model: model.DetectionModel
+        shift_amount_list: List[List[int]]
+            List of shift amounts for each image, each in form [shift_x, shift_y]
+        full_shape: List
+            Size of the full image, should be in the form of [height, width]
+        postprocess: sahi.postprocess.combine.PostprocessPredictions
+        verbose: int
+            0: no print (default)
+            1: print prediction duration
+        exclude_classes_by_name: Optional[List[str]]
+            None: if no classes are excluded
+            List[str]: set of classes to exclude using its/their class label name/s
+        exclude_classes_by_id: Optional[List[int]]
+            None: if no classes are excluded
+            List[int]: set of classes to exclude using one or more IDs
+        device: str | None
+            Device to use for GPU inference. If None, uses detection_model.device.
+    Returns:
+        object_prediction_list: a list of ObjectPrediction (already shifted)
+    """
+    durations_in_seconds = dict()
+
+    # Get device from detection_model if not specified
+    if device is None:
+        device = getattr(detection_model, 'device', 'cuda')
+
+    batch_size = images.shape[0]
+    
+    # Ensure shift_amount_list is properly initialized
+    if shift_amount_list is None:
+        shift_amount_list = [[0, 0] for _ in range(batch_size)]
+
+    # Convert full_shape to a list of shapes (one per image) if it's a single shape
+    if full_shape is not None:
+        # Check if it's already a list of shapes or a single shape
+        if isinstance(full_shape[0], (list, tuple)):
+            full_shape_list = full_shape
+        else:
+            # Single shape - replicate for all images in batch
+            full_shape_list = [full_shape for _ in range(batch_size)]
+    else:
+        full_shape_list = None
+
+    time_start = time.perf_counter()
+    # Perform batch inference
+    detection_model.perform_inference_gpu(images)
+    time_end = time.perf_counter() - time_start
+    durations_in_seconds["prediction"] = time_end
+
+    # Process predictions for each image in batch
+    time_start = time.perf_counter()
+    detection_model.convert_original_predictions(
+        shift_amount=shift_amount_list,
+        full_shape=full_shape_list,
+    )
+    
+    # Get predictions for all images in batch
+    object_prediction_list_per_image = detection_model.object_prediction_list_per_image
+    
+    # Collect all predictions and shift them
+    all_object_predictions = []
+    for image_idx, object_prediction_list in enumerate(object_prediction_list_per_image):
+        object_prediction_list = filter_predictions(
+            object_prediction_list, exclude_classes_by_name, exclude_classes_by_id
+        )
+        for object_prediction in object_prediction_list:
+            if object_prediction:
+                all_object_predictions.append(object_prediction.get_shifted_object_prediction())
+
+    # postprocess matching predictions
+    if postprocess is not None:
+        all_object_predictions = postprocess(all_object_predictions)
+
+    time_end = time.perf_counter() - time_start
+    durations_in_seconds["postprocess"] = time_end
+
+    if verbose == 1:
+        print(
+            "Batch prediction performed in",
+            durations_in_seconds["prediction"],
+            "seconds.",
+        )
+
+    return all_object_predictions, durations_in_seconds
+
+
 def get_sliced_prediction(
     image,
     detection_model=None,
@@ -445,7 +547,7 @@ def get_sliced_prediction(
     )
 
 def get_sliced_prediction_gpu(
-    image: str | torch.Tensor,
+    image,
     detection_model=None,
     slice_height: int | None = None,
     slice_width: int | None = None,
@@ -466,6 +568,7 @@ def get_sliced_prediction_gpu(
     progress_bar: bool = False,
     progress_callback=None,
     device: str | None = None,
+    batch_tile: bool = False,
 ) -> PredictionResult:
     """Function for slice image + get predicion for each slice + combine predictions in full image.
 
@@ -527,6 +630,9 @@ def get_sliced_prediction_gpu(
             The function should accept two arguments: (current_slice, total_slices)
         device: str | None
             Device to use for GPU inference. If None, uses detection_model.device.
+        batch_tile: bool
+            If True, all tiles are stacked into a batch and inferred in a single forward pass.
+            Batch size equals number of tiles. Default: False.
     Returns:
         A Dict with fields:
             object_prediction_list: a list of sahi.prediction.ObjectPrediction
@@ -540,8 +646,6 @@ def get_sliced_prediction_gpu(
     if device is None:
         device = getattr(detection_model, 'device', 'cuda')
 
-    # currently only 1 batch supported
-    num_batch = 1
     # create slices from full image
     time_start = time.perf_counter()
     slice_image_result = slice_image_gpu(
@@ -580,30 +684,21 @@ def get_sliced_prediction_gpu(
 
     postprocess_time = 0
     time_start = time.perf_counter()
-    # create prediction input
-    num_group = int(num_slices / num_batch)
+    
     if verbose == 1 or verbose == 2:
-        tqdm.write(f"Performing prediction on {num_slices} slices.")
-
-    if progress_bar:
-        slice_iterator = tqdm(range(num_group), desc="Processing slices", total=num_group)
-    else:
-        slice_iterator = range(num_group)
+        tqdm.write(f"Performing prediction on {num_slices} slices (batch_tile={batch_tile}).")
 
     object_prediction_list = []
-    # perform sliced prediction
-    for group_ind in slice_iterator:
-        # prepare batch (currently supports only 1 batch)
-        image_list = []
-        shift_amount_list = []
-        for image_ind in range(num_batch):
-            image_list.append(slice_image_result.images[group_ind * num_batch + image_ind])
-            shift_amount_list.append(slice_image_result.starting_pixels[group_ind * num_batch + image_ind])
-        # perform batch prediction
-        prediction_result = get_prediction_gpu(
-            image=image_list[0],
+    
+    if batch_tile:
+        batch_tensor = slice_image_result.get_batch_tiles()  # stack all tiles and infer in a single forward pass
+        shift_amount_list = slice_image_result.starting_pixels
+        
+        # Perform batch prediction
+        batch_predictions, batch_durations = get_prediction_gpu_batch(
+            images=batch_tensor,
             detection_model=detection_model,
-            shift_amount=shift_amount_list[0],
+            shift_amount_list=shift_amount_list,
             full_shape=[
                 slice_image_result.original_image_height,
                 slice_image_result.original_image_width,
@@ -612,20 +707,53 @@ def get_sliced_prediction_gpu(
             exclude_classes_by_id=exclude_classes_by_id,
             device=device,
         )
-        # convert sliced predictions to full predictions
-        for object_prediction in prediction_result.object_prediction_list:
-            if object_prediction:  # if not empty
-                object_prediction_list.append(object_prediction.get_shifted_object_prediction())
-
-        # merge matching predictions during sliced prediction
-        if merge_buffer_length is not None and len(object_prediction_list) > merge_buffer_length:
-            postprocess_time_start = time.time()
-            object_prediction_list = postprocess(object_prediction_list)
-            postprocess_time += time.time() - postprocess_time_start
-
-        # Call progress callback if provided
+        object_prediction_list.extend(batch_predictions)
+        
         if progress_callback is not None:
-            progress_callback(group_ind + 1, num_group)
+            progress_callback(num_slices, num_slices)
+    else:
+        num_batch = 1
+        num_group = int(num_slices / num_batch)
+        
+        if progress_bar:
+            slice_iterator = tqdm(range(num_group), desc="Processing slices", total=num_group)
+        else:
+            slice_iterator = range(num_group)
+
+        for group_ind in slice_iterator:
+            # prepare batch (currently supports only 1 batch)
+            image_list = []
+            shift_amount_list = []
+            for image_ind in range(num_batch):
+                image_list.append(slice_image_result.images[group_ind * num_batch + image_ind])
+                shift_amount_list.append(slice_image_result.starting_pixels[group_ind * num_batch + image_ind])
+            # perform batch prediction
+            prediction_result = get_prediction_gpu(
+                image=image_list[0],
+                detection_model=detection_model,
+                shift_amount=shift_amount_list[0],
+                full_shape=[
+                    slice_image_result.original_image_height,
+                    slice_image_result.original_image_width,
+                ],
+                exclude_classes_by_name=exclude_classes_by_name,
+                exclude_classes_by_id=exclude_classes_by_id,
+                device=device,
+            )
+            # convert sliced predictions to full predictions
+            for object_prediction in prediction_result.object_prediction_list:
+                if object_prediction:  # if not empty
+                    object_prediction_list.append(object_prediction.get_shifted_object_prediction())
+
+            # merge matching predictions during sliced prediction
+            if merge_buffer_length is not None and len(object_prediction_list) > merge_buffer_length:
+                postprocess_time_start = time.time()
+                object_prediction_list = postprocess(object_prediction_list)
+                postprocess_time += time.time() - postprocess_time_start
+
+            # Call progress callback if provided
+            if progress_callback is not None:
+                progress_callback(group_ind + 1, num_group)
 
     # perform standard prediction
     if num_slices > 1 and perform_standard_pred:

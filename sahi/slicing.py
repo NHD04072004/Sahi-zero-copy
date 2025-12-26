@@ -261,6 +261,50 @@ class SliceImageResult:
     def __len__(self):
         return len(self._sliced_image_list)
 
+    def get_batch_tiles(self) -> torch.Tensor:
+        """Stack all tile images into a batch tensor (B, C, H, W).
+        
+        Handles tiles of different sizes by padding smaller tiles to match the largest tile.
+        Returns:
+            batch_tensor: torch.Tensor of shape (B, C, H, W)
+        """
+        tiles = self.images
+        if len(tiles) == 0:
+            raise ValueError("No tiles to batch")
+        
+        if isinstance(tiles[0], torch.Tensor):
+            max_h = max(t.shape[1] for t in tiles)
+            max_w = max(t.shape[2] for t in tiles)
+            
+            padded_tiles = []
+            for t in tiles:
+                pad_h = max_h - t.shape[1]
+                pad_w = max_w - t.shape[2]
+                if pad_h > 0 or pad_w > 0:
+                    t = torch.nn.functional.pad(t, (0, pad_w, 0, pad_h), mode='constant', value=0)  # (left, right, top, bottom)
+                padded_tiles.append(t)
+            
+            return torch.stack(padded_tiles, dim=0)
+        else:
+            max_h = max(t.shape[0] for t in tiles)
+            max_w = max(t.shape[1] for t in tiles)
+            
+            padded_tiles = []
+            for t in tiles:
+                # Convert HWC to CHW
+                if t.ndim == 3:
+                    t_tensor = torch.from_numpy(t).permute(2, 0, 1)
+                else:
+                    t_tensor = torch.from_numpy(t).unsqueeze(0)
+                
+                pad_h = max_h - t_tensor.shape[1]
+                pad_w = max_w - t_tensor.shape[2]
+                if pad_h > 0 or pad_w > 0:
+                    t_tensor = torch.nn.functional.pad(t_tensor, (0, pad_w, 0, pad_h), mode='constant', value=0)
+                padded_tiles.append(t_tensor)
+            
+            return torch.stack(padded_tiles, dim=0)
+
 
 def slice_image(
     image: str | Image.Image,
