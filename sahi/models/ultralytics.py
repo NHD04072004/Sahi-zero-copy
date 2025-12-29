@@ -5,6 +5,7 @@ from typing import Any
 import cv2
 import numpy as np
 import torch
+import torch.nn.functional as F
 
 from sahi.logger import logger
 from sahi.models.base import DetectionModel
@@ -290,6 +291,9 @@ class UltralyticsDetectionModel(DetectionModel):
         """self._original_predictions is converted to a list of prediction.ObjectPrediction and set to
         self._object_prediction_list_per_image.
 
+        GPU-optimized version: Uses tensor operations on GPU and only converts to CPU
+        when creating final ObjectPrediction objects.
+
         Args:
             shift_amount_list: list of list
                 To shift the box and mask predictions from sliced image to full sized image, should
@@ -314,47 +318,101 @@ class UltralyticsDetectionModel(DetectionModel):
 
             # Extract boxes and optional masks/obb
             if self.has_mask or self.is_obb:
-                boxes = image_predictions[0].cpu().detach().numpy()
-                masks_or_points = image_predictions[1].cpu().detach().numpy()
+                boxes_tensor = image_predictions[0].detach()  # (N, 6)
+                masks_or_points_tensor = image_predictions[1].detach()  # (N, H, W) or (N, 4, 2)
             else:
-                boxes = image_predictions.data.cpu().detach().numpy()
-                masks_or_points = None
+                boxes_tensor = image_predictions.data if hasattr(image_predictions, 'data') else image_predictions
+                masks_or_points_tensor = None
 
-            # Process each prediction
-            for pred_ind, prediction in enumerate(boxes):
-                # Get bbox coordinates
-                bbox = prediction[:4].tolist()
-                score = prediction[4]
-                category_id = int(prediction[5])
+            # Skip if no predictions
+            if len(boxes_tensor) == 0:
+                object_prediction_list_per_image.append([])
+                continue
+
+            # Get device for tensor operations
+            device = boxes_tensor.device
+
+            # Extract box components
+            bboxes = boxes_tensor[:, :4].clone()  # (N, 4) [x1, y1, x2, y2]
+            scores = boxes_tensor[:, 4]  # (N,)
+            class_ids = boxes_tensor[:, 5].long()  # (N,)
+
+            # Fix box coordinates using tensor operations
+            bboxes = torch.clamp(bboxes, min=0)
+            if full_shape is not None:
+                # Clamp to full_shape bounds: [height, width]
+                max_x = float(full_shape[1])
+                max_y = float(full_shape[0])
+                bboxes[:, 0] = torch.clamp(bboxes[:, 0], max=max_x)  # x1
+                bboxes[:, 1] = torch.clamp(bboxes[:, 1], max=max_y)  # y1
+                bboxes[:, 2] = torch.clamp(bboxes[:, 2], max=max_x)  # x2
+                bboxes[:, 3] = torch.clamp(bboxes[:, 3], max=max_y)  # y2
+
+            # Filter invalid boxes using tensor mask
+            valid_mask = (bboxes[:, 0] < bboxes[:, 2]) & (bboxes[:, 1] < bboxes[:, 3])
+            valid_indices = torch.where(valid_mask)[0]
+
+            # Log invalid predictions count
+            num_invalid = len(bboxes) - len(valid_indices)
+            if num_invalid > 0:
+                logger.warning(f"Ignoring {num_invalid} invalid predictions with invalid bbox dimensions")
+
+            # Filter tensors to valid predictions only
+            bboxes = bboxes[valid_indices]
+            scores = scores[valid_indices]
+            class_ids = class_ids[valid_indices]
+            if masks_or_points_tensor is not None:
+                masks_or_points_tensor = masks_or_points_tensor[valid_indices]
+
+            # Resize masks if needed
+            resized_masks = None
+            if self.has_mask and masks_or_points_tensor is not None and len(masks_or_points_tensor) > 0:
+                # masks_or_points_tensor: (N, H, W)
+                # Target size: (original_height, original_width)
+                target_h, target_w = self._original_shape[0], self._original_shape[1]
+                
+                # Add batch and channel dims for F.interpolate: (N, 1, H, W)
+                masks_4d = masks_or_points_tensor.unsqueeze(1).float()
+                
+                # Resize using bilinear interpolation
+                resized_masks = F.interpolate(
+                    masks_4d,
+                    size=(target_h, target_w),
+                    mode='bilinear',
+                    align_corners=False
+                ).squeeze(1)  # Back to (N, H, W)
+                
+                # Convert to binary mask (threshold at 0.5)
+                resized_masks = (resized_masks > 0.5).cpu().numpy().astype(np.uint8)
+
+            # Convert to CPU for ObjectPrediction creation
+            bboxes_cpu = bboxes.cpu().numpy()
+            scores_cpu = scores.cpu().numpy()
+            class_ids_cpu = class_ids.cpu().numpy()
+            
+            if masks_or_points_tensor is not None and not self.has_mask:
+                # OBB points - convert to CPU
+                obb_points_cpu = masks_or_points_tensor.cpu().numpy()
+            else:
+                obb_points_cpu = None
+
+            # Create ObjectPrediction objects
+            for pred_ind in range(len(bboxes_cpu)):
+                bbox = bboxes_cpu[pred_ind].tolist()
+                score = float(scores_cpu[pred_ind])
+                category_id = int(class_ids_cpu[pred_ind])
                 category_name = self.category_mapping[str(category_id)]
 
-                # Fix box coordinates
-                bbox = [max(0, coord) for coord in bbox]
-                if full_shape is not None:
-                    bbox[0] = min(full_shape[1], bbox[0])
-                    bbox[1] = min(full_shape[0], bbox[1])
-                    bbox[2] = min(full_shape[1], bbox[2])
-                    bbox[3] = min(full_shape[0], bbox[3])
-
-                # Ignore invalid predictions
-                if not (bbox[0] < bbox[2]) or not (bbox[1] < bbox[3]):
-                    logger.warning(f"ignoring invalid prediction with bbox: {bbox}")
-                    continue
-
-                # Get segmentation or OBB points
+                # Get segmentation
                 segmentation = None
-                if masks_or_points is not None:
-                    if self.has_mask:
-                        bool_mask = masks_or_points[pred_ind]
-                        # Resize mask to original image size
-                        bool_mask = cv2.resize(
-                            bool_mask.astype(np.uint8), (self._original_shape[1], self._original_shape[0])
-                        )
-                        segmentation = get_coco_segmentation_from_bool_mask(bool_mask)
-                    else:  # is_obb
-                        obb_points = masks_or_points[pred_ind]  # Get OBB points for this prediction
-                        segmentation = [obb_points.reshape(-1).tolist()]
-
+                if resized_masks is not None:
+                    bool_mask = resized_masks[pred_ind]
+                    segmentation = get_coco_segmentation_from_bool_mask(bool_mask)
+                    if len(segmentation) == 0:
+                        continue
+                elif obb_points_cpu is not None:
+                    obb_points = obb_points_cpu[pred_ind]
+                    segmentation = [obb_points.reshape(-1).tolist()]
                     if len(segmentation) == 0:
                         continue
 
@@ -366,7 +424,7 @@ class UltralyticsDetectionModel(DetectionModel):
                     segmentation=segmentation,
                     category_name=category_name,
                     shift_amount=shift_amount,
-                    full_shape=self._original_shape[:2] if full_shape is None else full_shape,  # (height, width)
+                    full_shape=self._original_shape[:2] if full_shape is None else full_shape,
                 )
                 object_prediction_list.append(object_prediction)
 
