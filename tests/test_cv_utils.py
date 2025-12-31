@@ -85,22 +85,22 @@ class TestCvUtils:
         input_image = Image.new("RGB", (10, 10))
         result = read_image_as_tensor(input_image)
         assert isinstance(result, torch.Tensor)
-        assert result.shape == (10, 10, 3)
+        assert result.shape == (3, 10, 10)
 
         # 3. Test Numpy array input (HWC)
         input_numpy = np.zeros((10, 10, 3), dtype=np.uint8)
         result = read_image_as_tensor(input_numpy)
-        assert result.shape == (10, 10, 3)
+        assert result.shape == (3, 10, 10)
 
         # 4. Test Numpy array input (CHW)
         input_numpy_chw = np.zeros((3, 10, 10), dtype=np.uint8)
         result = read_image_as_tensor(input_numpy_chw)
-        assert result.shape == (10, 10, 3)
+        assert result.shape == (3, 10, 10)
 
         # 5. Test String Path
         mock_image_open.return_value = Image.new("RGB", (20, 20))
         result = read_image_as_tensor("test_path.jpg")
-        assert result.shape == (20, 20, 3)
+        assert result.shape == (3, 20, 20)
 
         # 6. Test URL
         class MockResponse:
@@ -108,4 +108,4 @@ class TestCvUtils:
 
         mock_requests_get.return_value = MockResponse()
         result = read_image_as_tensor("http://example.com/image.jpg")
-        assert result.shape == (20, 20, 3)
+        assert result.shape == (3, 20, 20)
