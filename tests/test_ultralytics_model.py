@@ -40,17 +40,20 @@ def test_load_yolo11_model():
 @pytest.mark.skipif(sys.version_info < (3, 10), reason="ONNX model tests require Python 3.10 or higher")
 def test_load_yolo11_onnx_model():
     from sahi.models.ultralytics import UltralyticsDetectionModel
+    from unittest.mock import patch
 
-    download_yolo11n_onnx_model()
+    # Mock cuda available to be False
+    with patch("torch.cuda.is_available", return_value=False):
+        download_yolo11n_onnx_model()
+    
+        detection_model = UltralyticsDetectionModel(
+            model_path=UltralyticsConstants.YOLO11N_ONNX_MODEL_PATH,
+            confidence_threshold=CONFIDENCE_THRESHOLD,
+            device="cpu", # Force cpu explicit
+            load_at_init=True,
+        )
 
-    detection_model = UltralyticsDetectionModel(
-        model_path=UltralyticsConstants.YOLO11N_ONNX_MODEL_PATH,
-        confidence_threshold=CONFIDENCE_THRESHOLD,
-        device=MODEL_DEVICE,
-        load_at_init=True,
-    )
-
-    assert detection_model.model is not None
+        assert detection_model.model is not None
 
 
 def test_perform_inference_yolo11():
