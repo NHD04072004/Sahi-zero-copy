@@ -1,4 +1,4 @@
-certifi                  2025.11.12
+certifi
 charset-normalizer       3.4.4
 click                    8.3.1
 filelock                 3.20.1
