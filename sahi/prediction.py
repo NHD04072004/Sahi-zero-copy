@@ -160,18 +160,12 @@ class PredictionResult:
     def __init__(
         self,
         object_prediction_list: list[ObjectPrediction],
-        image: Image.Image | str | np.ndarray,
+        image: Image.Image | str | np.ndarray | torch.Tensor,
         durations_in_seconds: dict[str, Any] = dict(),
     ):
         self.image = read_image_as_tensor(image)
-        if hasattr(self.image, "shape"): # Tensor or Numpy
-            # Assume HWC format
-            self.image_height = self.image.shape[0]
-            self.image_width = self.image.shape[1]
-        elif hasattr(self.image, "size"): # PIL
-            self.image_width, self.image_height = self.image.size
-        else:
-            raise TypeError(f"Unsupported image type: {type(self.image)}")
+        self.image_height = self.image.shape[1]
+        self.image_width = self.image.shape[2]
         self.object_prediction_list: list[ObjectPrediction] = object_prediction_list
         self.durations_in_seconds = durations_in_seconds
 

@@ -176,7 +176,7 @@ class UltralyticsDetectionModel(DetectionModel):
         pad_w = (stride - w % stride) % stride
 
         if pad_h > 0 or pad_w > 0:
-            image_bchw = torch.nn.functional.pad(image_bchw, (0, pad_w, 0, pad_h), mode='constant', value=0)
+            image_bchw = F.pad(image_bchw, (0, pad_w, 0, pad_h), mode='constant', value=0)
 
         kwargs = {"cfg": self.config_path, "verbose": False, "conf": self.confidence_threshold, "device": self.device}
 
@@ -328,9 +328,6 @@ class UltralyticsDetectionModel(DetectionModel):
             if len(boxes_tensor) == 0:
                 object_prediction_list_per_image.append([])
                 continue
-
-            # Get device for tensor operations
-            device = boxes_tensor.device
 
             # Extract box components
             bboxes = boxes_tensor[:, :4].clone()  # (N, 4) [x1, y1, x2, y2]

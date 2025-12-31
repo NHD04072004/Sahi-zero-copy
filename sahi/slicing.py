@@ -9,6 +9,7 @@ from typing import Literal
 import cv2
 import numpy as np
 import torch
+import torch.nn.functional as F
 from PIL import Image
 from shapely.errors import TopologicalError
 from tqdm import tqdm
@@ -151,7 +152,7 @@ def process_coco_annotations(
 class SlicedImage:
     def __init__(self, image, coco_image, starting_pixel):
         """
-        image: np.array
+        image: np.array | torch.Tensor
             Sliced image.
         coco_image: CocoImage
             Coco styled image object that belong to sliced image.
@@ -281,7 +282,7 @@ class SliceImageResult:
                 pad_h = max_h - t.shape[1]
                 pad_w = max_w - t.shape[2]
                 if pad_h > 0 or pad_w > 0:
-                    t = torch.nn.functional.pad(t, (0, pad_w, 0, pad_h), mode='constant', value=0)  # (left, right, top, bottom)
+                    t = F.pad(t, (0, pad_w, 0, pad_h), mode='constant', value=0)  # (left, right, top, bottom)
                 padded_tiles.append(t)
             
             return torch.stack(padded_tiles, dim=0)
@@ -300,7 +301,7 @@ class SliceImageResult:
                 pad_h = max_h - t_tensor.shape[1]
                 pad_w = max_w - t_tensor.shape[2]
                 if pad_h > 0 or pad_w > 0:
-                    t_tensor = torch.nn.functional.pad(t_tensor, (0, pad_w, 0, pad_h), mode='constant', value=0)
+                    t_tensor = F.pad(t_tensor, (0, pad_w, 0, pad_h), mode='constant', value=0)
                 padded_tiles.append(t_tensor)
             
             return torch.stack(padded_tiles, dim=0)

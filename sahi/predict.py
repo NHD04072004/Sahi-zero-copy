@@ -233,7 +233,7 @@ def get_prediction_gpu_batch(
     exclude_classes_by_name: list[str] | None = None,
     exclude_classes_by_id: list[int] | None = None,
     device: str | None = None,
-) -> list[ObjectPrediction]:
+) -> tuple[list[ObjectPrediction], dict]:
     """Function for performing batch prediction on multiple images using given detection_model.
 
     Args:

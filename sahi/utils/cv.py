@@ -216,13 +216,13 @@ def read_image_as_pil(image: Image.Image | str | np.ndarray, exif_fix: bool = Tr
         raise TypeError("read image with 'pillow' using 'Image.open()'")
     return image_pil
 
-def read_image_as_tensor(image: Image.Image | str | np.ndarray | torch.Tensor, device: str = "cpu") -> torch.Tensor:
+def read_image_as_tensor(image: Image.Image | str | np.ndarray | torch.Tensor, device: str | None = None) -> torch.Tensor:
     """Loads an image as torch.Tensor.
 
     Args:
         image (Union[Image.Image, str, np.ndarray, torch.Tensor]): The image to be loaded. It can be an image path or URL (str),
             a numpy image (np.ndarray), or a PIL.Image object or torch.Tensor.
-        device (str, optional): The device to load the image on. Defaults to "cpu".
+        device (str | None, optional): The device to load the image on. Defaults to None.
 
     Returns:
         torch.Tensor: The loaded image as a torch.Tensor object.
@@ -256,6 +256,7 @@ def read_image_as_tensor(image: Image.Image | str | np.ndarray | torch.Tensor, d
                 raise TypeError(f"image with shape: {image_sk.shape} is not supported.")
 
     elif isinstance(image, np.ndarray):
+        image = np.ascontiguousarray(image)
         if image.ndim == 3 and image.shape[0] <= 4 and image.shape[2] > 4:
             img_tensor = torch.from_numpy(image)
         elif image.ndim == 3:
