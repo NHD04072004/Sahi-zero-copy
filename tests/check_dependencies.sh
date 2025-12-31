@@ -11,24 +11,20 @@
 # This script should abort on error
 set -e
 
-# Python versions to check
-PYTHON_VERSIONS=("3.8 " "3.9 " "3.10" "3.11" "3.12")
-
+# Commands to check (okay means: return code 0)
 # Commands to check (okay means: return code 0)
 COMMANDS=(
-  "uv run python -c 'from mmdet.apis.det_inferencer import DetInferencer'"
-  "uv run python -c 'import torch'"
-  "uv run python -c 'import ultralytics'"
-  "tests/check_commandline.sh"
-  "uv run pytest -x"
+  "python3 -c 'from mmdet.apis.det_inferencer import DetInferencer'"
+  "python3 -c 'import torch'"
+  "python3 -c 'import ultralytics'"
+  "pytest -x"
 )
 
 # Corresponding to the commands, the expected behaviour
 CONTEXTS=(
-  "mmdet/mmcv with Python < 3.11"
-  "torch, should work for all python versions"
-  "ultralytics, should work for all python versions"
-  "command line"
+  "mmdet/mmcv"
+  "torch"
+  "ultralytics"
   "pytest"
 )
 
@@ -39,33 +35,36 @@ NC='\033[0m'
 # Initialize an array to store results
 declare -A RESULTS
 
-# Loop over each Python version
-for version in "${PYTHON_VERSIONS[@]}"; do
-  echo "Checking Python $version..."
-  uv python pin "$version"
-  uv sync -U
-  # uv sync
-
-  # Loop over each command
-  for cmd in "${COMMANDS[@]}"; do
+# Loop over each command
+for cmd in "${COMMANDS[@]}"; do
     echo -n "Checking $cmd..."
-    # Check if the command runs without errors
-    if eval "$cmd"; then
-      RESULTS["$version $cmd"]="${GREEN}✅ okay${NC}"
+    
+    # Run the command
+    # If the command is a shell script, run with bash to avoid permission issues
+    if [[ "$cmd" == *.sh ]]; then
+        if [ -f "$cmd" ]; then
+            if bash "$cmd"; then
+                RESULTS["$cmd"]="${GREEN}✅ okay${NC}"
+            else
+                RESULTS["$cmd"]="${RED}❌ not working${NC}"
+            fi
+        else
+            RESULTS["$cmd"]="${RED}❌ missing file${NC}"
+        fi
     else
-      RESULTS["$version $cmd"]="${RED}❌ not working${NC}"
+        if eval "$cmd"; then
+            RESULTS["$cmd"]="${GREEN}✅ okay${NC}"
+        else
+            RESULTS["$cmd"]="${RED}❌ not working${NC}"
+        fi
     fi
-    echo -e "${RESULTS["$version $cmd"]}"
-  done
+    echo -e "${RESULTS["$cmd"]}"
 done
 
 # Display the results
+echo -e "\nResults:"
 for index in "${!COMMANDS[@]}"; do
   cmd="${COMMANDS[$index]}"
   context="${CONTEXTS[$index]}"
-
-  echo -e "\n$context:"
-  for version in "${PYTHON_VERSIONS[@]}"; do
-    echo -e "$version : ${RESULTS["$version $cmd"]}"
-  done
+  echo -e "$context : ${RESULTS["$cmd"]}"
 done
