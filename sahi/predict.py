@@ -891,7 +891,7 @@ def predict(
             model_type, model_path, config_path, model_device, model_category_mapping, image_size
             params will be ignored
         model_type: str
-            mmdet for 'MmdetDetectionModel', 'yolov5' for 'Yolov5DetectionModel'.
+            'ultralytics' for 'UltralyticsDetectionModel', 'yolov5' for 'Yolov5DetectionModel'.
         model_path: str
             Path for the model weight
         model_config_path: str
@@ -1258,7 +1258,7 @@ def predict(
 
 
 def predict_fiftyone(
-    model_type: str = "mmdet",
+    model_type: str = "yolov5",
     model_path: str | None = None,
     model_config_path: str | None = None,
     model_confidence_threshold: float = 0.25,
@@ -1287,7 +1287,7 @@ def predict_fiftyone(
 
     Args:
         model_type: str
-            mmdet for 'MmdetDetectionModel', 'yolov5' for 'Yolov5DetectionModel'.
+            'ultralytics' for 'UltralyticsDetectionModel', 'yolov5' for 'Yolov5DetectionModel'.
         model_path: str
             Path for the model weight
         model_config_path: str

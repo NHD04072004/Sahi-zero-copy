@@ -14,7 +14,6 @@ set -e
 # Commands to check (okay means: return code 0)
 # Commands to check (okay means: return code 0)
 COMMANDS=(
-  "python3 -c 'from mmdet.apis.det_inferencer import DetInferencer'"
   "python3 -c 'import torch'"
   "python3 -c 'import ultralytics'"
   "pytest -x"
@@ -22,7 +21,6 @@ COMMANDS=(
 
 # Corresponding to the commands, the expected behaviour
 CONTEXTS=(
-  "mmdet/mmcv"
   "torch"
   "ultralytics"
   "pytest"

@@ -30,13 +30,8 @@ def get_package_info(package_name: str, verbose: bool = True):
 def print_environment_info():
     get_package_info("torch")
     get_package_info("torchvision")
-    get_package_info("tensorflow")
-    get_package_info("tensorflow-hub")
     get_package_info("ultralytics")
     get_package_info("yolov5")
-    get_package_info("mmdet")
-    get_package_info("mmcv")
-    get_package_info("detectron2")
     get_package_info("transformers")
     get_package_info("timm")
     get_package_info("fiftyone")

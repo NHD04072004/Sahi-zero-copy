@@ -230,9 +230,9 @@ def import_model_class(model_type, class_name):
 
     Args:
         model_type: str
-            "yolov5", "detectron2", "mmdet", "huggingface" etc
+            "yolov5", "huggingface" etc
         model_name: str
-            Name of the detection model class (example: "MmdetDetectionModel")
+            Name of the detection model class (example: "Yolov5DetectionModel")
     Returns:
         class_: class with given path
     """

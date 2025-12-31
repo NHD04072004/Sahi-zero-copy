@@ -8,12 +8,8 @@ from sahi.utils.file import import_model_class
 MODEL_TYPE_TO_MODEL_CLASS_NAME = {
     "ultralytics": "UltralyticsDetectionModel",
     "rtdetr": "RTDetrDetectionModel",
-    "mmdet": "MmdetDetectionModel",
     "yolov5": "Yolov5DetectionModel",
-    "detectron2": "Detectron2DetectionModel",
     "huggingface": "HuggingfaceDetectionModel",
-    "torchvision": "TorchVisionDetectionModel",
-    "roboflow": "RoboflowDetectionModel",
     "yolo-world": "YOLOWORLDDetectionModel",
     "yoloe": "YOLOEDetectionModel",
 }
@@ -41,13 +37,13 @@ class AutoDetectionModel:
 
         Args:
             model_type: str
-                Name of the detection framework (example: "ultralytics", "huggingface", "torchvision")
+                Name of the detection framework (example: "ultralytics", "huggingface")
             model_path: str
                 Path of the detection model (ex. 'model.pt')
             model: Any
                 A pre-initialized model instance, if available
             config_path: str
-                Path of the config file (ex. 'mmdet/configs/cascade_rcnn_r50_fpn_1x.py')
+                Path of the config file (ex. 'yolov5s.yaml')
             device: str
                 Device, "cpu" or "cuda:0"
             mask_threshold: float
