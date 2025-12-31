@@ -42,6 +42,7 @@ jobs:
           pip install --upgrade pip
           pip install pytest
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          pip install ultralytics yolov5 transformers scikit-image imagecodecs
       - name: Test with pytest
         run: |
           pytest
